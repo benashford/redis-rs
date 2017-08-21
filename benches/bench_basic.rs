@@ -22,6 +22,30 @@ fn bench_simple_getsetdel(b: &mut Bencher) {
 }
 
 #[bench]
+fn bench_big_pipeline(b: &mut Bencher) {
+    let client = get_client();
+    let con = client.get_connection().unwrap();
+
+    let data_size = 1000;
+
+    b.iter(|| {
+        let mut pipe = redis::pipe();
+        for x in 0..data_size {
+            let test_key = format!("test_{}", x);
+            pipe.cmd("SET").arg(test_key).arg(x.to_string()).ignore();
+        }
+        let _:() = pipe.query(&con).unwrap();
+        let mut pipe = redis::pipe();
+        for x in 0..data_size {
+            let test_key = format!("test_{}", x);
+            pipe.cmd("GET").arg(test_key);
+        }
+        let mut result:Vec<String> = pipe.query(&con).unwrap();
+        result.remove(999);
+    });
+}
+
+#[bench]
 fn bench_simple_getsetdel_pipeline(b: &mut Bencher) {
     let client = get_client();
     let con = client.get_connection().unwrap();
