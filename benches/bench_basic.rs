@@ -26,7 +26,7 @@ fn bench_big_pipeline(b: &mut Bencher) {
     let client = get_client();
     let con = client.get_connection().unwrap();
 
-    let data_size = 1000;
+    let data_size = 100;
 
     b.iter(|| {
         let mut pipe = redis::pipe();
@@ -41,7 +41,45 @@ fn bench_big_pipeline(b: &mut Bencher) {
             pipe.cmd("GET").arg(test_key);
         }
         let mut result:Vec<String> = pipe.query(&con).unwrap();
-        result.remove(999);
+        result.remove(99);
+    });
+}
+
+#[bench]
+fn bench_complex(b: &mut Bencher) {
+    let client = get_client();
+    let con = client.get_connection().unwrap();
+
+    let data_size = 100;
+
+    b.iter(|| {
+        for x in 0..data_size {
+            let key: isize = redis::cmd("INCR").arg("id_gen").query(&con).unwrap();
+            let key = format!("id_{}", key);
+            redis::cmd("SET").arg(key).arg(x.to_string()).execute(&con);
+        }
+    });
+}
+
+#[bench]
+fn bench_complex_pipeline(b: &mut Bencher) {
+    let client = get_client();
+    let con = client.get_connection().unwrap();
+
+    let data_size = 100;
+
+    b.iter(|| {
+        let mut id_pipe = redis::pipe();
+        for x in 0..data_size {
+            id_pipe.cmd("INCR").arg("id_gen");
+        }
+        let ids:Vec<isize> = id_pipe.query(&con).unwrap();
+        let mut set_pipe = redis::pipe();
+        for x in 0..data_size {
+            let key = format!("id_{}", ids[x]);
+            set_pipe.cmd("SET").arg(key).arg(x.to_string());
+        }
+        let confirmations:Vec<String> = set_pipe.query(&con).unwrap();
     });
 }
 
